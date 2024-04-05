@@ -1,0 +1,60 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+
+# Make files
+Makefile
+*.mk
+*.cmake
+
+# IDE / Editor directories
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Other files and directories
+*.swp
+*.swo
+*.swn
+*.suo
+*.user
+*.userosscache
+*.com
+*.lss
+*.bak
+*.bak.*
+*.log
+*.tmp
+*.d
+*.map
+*.dep
+*.stackdump
