@@ -6,6 +6,11 @@
 
 
 
+int fft(){
+    
+    return 0;
+}
+
 int main(int argc, char **argv){ 
     // argc is argument count and argv is a list of arguments..
     int rank, size;
