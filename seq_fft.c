@@ -45,7 +45,7 @@ void invFft(complex double *vec, int len){
 void invFft_helper(complex double *vec, int len){
     invFft(vec, len);
     for (int i = 0; i < len; i++){
-        vec[i] = 1/(2*M_PI) * vec[i];
+        vec[i] = 1.0/len * vec[i];
     }
 }
 
@@ -62,19 +62,19 @@ int main(int argc, char **argv){
     FILE* file1 = fopen("untouched.txt", "w");
     for (int i=0; i < N; i++){
         randomVec[i] = (double)rand() / RAND_MAX;
-        fprintf(file1, "%f + i%f\n", creal(randomVec[i]), cimag(randomVec[i]));
+        fprintf(file1, "%f\n", creal(randomVec[i]));
     }
     fclose(file1);
     fft(randomVec, N);
     FILE * file2 = fopen("after_trans.txt", "w");
     for (int i = 0; i < N; i++){
-        fprintf(file2, "%f + i%f\n", creal(randomVec[i]), cimag(randomVec[i]));
+        fprintf(file2, "%f\n", creal(randomVec[i]));
     } 
     fclose(file2);
     invFft_helper(randomVec, N);
     FILE* file3 = fopen("transed_back.txt", "w");
     for (int i = 0; i < N; i++){
-        fprintf(file3, "%f + i%f\n", creal(randomVec[i]), cimag(randomVec[i]));
+        fprintf(file3, "%f\n", creal(randomVec[i]));
     } 
     fclose(file3);
     exit(0);
