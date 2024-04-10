@@ -8,10 +8,11 @@
 
 
 void fft(complex double  *vec, int len){
+    // very basic implementation with several faults, that could damage performance for large inputs..
     if (len <= 1) return;
     complex double even[len/2]; 
     complex double odd[len/2];
-    for (int i; i<len/2;i++){
+    for (int i=0; i<len/2;i++){
         even[i] = vec[2*i];
         odd[i] = vec[i*2+1]; // ok because a factor of two:))
     }
@@ -23,6 +24,22 @@ void fft(complex double  *vec, int len){
         vec[i + len/2] = even[i] - w;
     }
 }
+
+void invFft(complex double *vec, int len){
+    if (len <= 1) return;
+    complex double even[len/2];
+    complex double even[len/2];
+    for (int i = 0; i < len/2; i++ )
+
+}
+
+void invFft_helper(complex double *vec, int len){
+    invFft(vec, len);
+    for (int i = 0; i < len; i++){
+        vec[i] = 1/(2*M_PI) * vec[i];
+    }
+}
+
 
 int main(int argc, char **argv){ 
     // argc is argument count and argv is a list of arguments..
