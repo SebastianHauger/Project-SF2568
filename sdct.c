@@ -64,24 +64,25 @@ void dct(complex double *vec, int len){
     for (int i=0; i < len;i++){
         vec[i] = 2.0*creal(cexp(-I*M_PI*i/(2.0*len))*ftilde[i]);
     }
+    vec[0] /= sqrt(2);
     free(ftilde);
 }
 
 
-
 void invDct(complex double *vec, int len){
     complex double* ftilde = malloc(len*sizeof(double complex));
-    for (int i = 0; i < len/2; i++){
-        ftilde[i] = vec[2*i];
-        ftilde[len-i-1] = vec[2*i+1];   
+    ftilde[0] = (1.0/sqrt(2))  * vec[0];
+    ftilde[len/2] = (1.0/sqrt(2)) * vec[len/2];
+    for (int i = 1; i < len; i++){
+        if (i != len/2){
+            ftilde[i] = 0.5*((vec[i]*cos(M_PI*i/(2*len)) + vec[len-i]*sin(M_PI*i/(2*len)))+I*(vec[i]*sin(M_PI*i/(2*len)) - vec[len-i]*cos(M_PI*i/(2*len))));
+        }
     }
     invFftHelper(ftilde, len);
-    // fft(ftilde, len);
-    for (int i=0; i < len;i++){
-        vec[i] = 1.0/len * creal(cexp(-I*M_PI*i/(2.0*len))*ftilde[i]);
-        // vec[2*i+1] = sqrt(2.0/len)*creal(cexp(-I*M_PI*(len-i-1)/(2*len))*ftilde[len-i-1]); 
+    for (int i=0; i < len/2;i++){
+        vec[2*i] = ftilde[i];
+        vec[2*i+1] = ftilde[len-i-1];
     }
-    vec[0] /= 2.0;
     free(ftilde);
 }
 
@@ -109,7 +110,7 @@ int main(int argc, char **argv){
     } 
     fclose(file2);
     invDct(randomVec,N);
-    // invFft_helper(randomVec, N);
+    // invFftHelper(randomVec, N);
     FILE* file3 = fopen("transed_back.txt", "w");
     for (int i = 0; i < N; i++){
         fprintf(file3, "%f\n", creal(randomVec[i]));

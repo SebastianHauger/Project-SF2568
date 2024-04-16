@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.fft import dct
+from scipy.fft import dct, idct
 
 def read_float(filename): 
     """read a textfile of floats and return a list of the values"""
@@ -11,26 +11,28 @@ def read_float(filename):
     return val
 
 def get_test_data():
-    seq = np.array([0.035844,
-0.427558,
-0.964480,
-0.007856,
-0.029386,
-0.888409,
-0.487235,
-0.957974,
-0.667670,
-0.527987,
-0.878195,
-0.825866,
-0.338036,
-0.366950,
-0.332365,
-0.065925,
+    seq = np.array([0.547858,
+0.848343,
+0.093534,
+0.023399,
+0.264044,
+0.780526,
+0.303612,
+0.808418,
+0.076458,
+0.037411,
+0.773003,
+0.859976,
+0.623247,
+0.908122,
+0.806442,
+0.877579
 
 ])
     dct_seq = dct(seq)
-    print(dct_seq)
+    seq = idct(dct_seq)
+    print("dct seq", dct_seq)
+    print("inverse dct seq", seq)
 
 if __name__=='__main__':
     get_test_data()
