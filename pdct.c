@@ -7,7 +7,27 @@
 #include <mpi.h>
 
 
-void fft(complex double  *vec, int len){
+/*
+A program to compute the parallel DCT and IDCT using the FFT and IFFT
+
+The program takes (at the moment) and extra agrument (more than standard and MPI arguments)
+this argument is the exponent of two which defines the length of the list
+ 
+ TODO:: 
+ 1. implement scheme for DFT and invDFT 
+ 2. parallelize embarrasingly parallel post processing for the inverse transform. 
+ 3. figure out scheme for pre processing DCT (and implement)
+ 4. figure out scheme for pre processing inverse DCT (and implement)
+
+ (
+    5. start with multidim schemes 
+    6. try algorithm on picture files (black and white)
+    7. Possibly try scheme on color picture as just three separate schemes
+ )
+ */
+
+
+void fft(complex double  *vec, int len, int localLen){
     // very basic implementation with several faults, that could damage performance for large inputs..
     if (len <= 1) return;
     complex double* even = malloc(len*sizeof(complex double));
@@ -16,8 +36,8 @@ void fft(complex double  *vec, int len){
         even[i] = vec[2*i];
         odd[i] = vec[i*2+1]; // ok because a factor of two:))
     }
-    fft(even, len/2);
-    fft(odd, len/2);
+    fft(even, len/2, localLen);
+    fft(odd, len/2, localLen);
     for (int i = 0; i < len/2; i++) {
         complex double w = cexp(-2.0*I*M_PI*i/len) * odd[i];
         vec[i] = even[i] + w;
@@ -28,7 +48,7 @@ void fft(complex double  *vec, int len){
 }
 
 
-void invFft(complex double *vec, int len){
+void invFft(complex double *vec, int len, int localLen){
     if (len <= 1) return;
     double complex even[len/2];
     double complex odd[len/2];
@@ -36,8 +56,8 @@ void invFft(complex double *vec, int len){
         even[i] = vec[2*i];
         odd[i] = vec[2*i + 1];
     }
-    invFft(even, len/2);
-    invFft(odd, len/2);
+    invFft(even, len/2, localLen);
+    invFft(odd, len/2, localLen);
     for (int i = 0; i < len/2; i++){
         complex double w = cexp(2.0*I*M_PI*i/len) * odd[i];
         vec[i] = even[i] + w; 
@@ -45,23 +65,23 @@ void invFft(complex double *vec, int len){
     }
 }
 
-void invFftHelper(complex double *vec, int len){
-    invFft(vec, len);
-    for (int i = 0; i < len; i++){
+void invFftHelper(complex double *vec, int len, int localLen){
+    invFft(vec, len, localLen);
+    for (int i = 0; i < localLen; i++){
         vec[i] = 1.0/len * vec[i];
     }
 }
 
 
-void dct(complex double *vec, int len){
+void dct(complex double *vec, int len, int localLen){
     /* the discrete cosine transformation, where depending on if vec is in the frequency 
     dimension or in the real dimension we get either frequencies or real numbers respectively*/ 
-    complex double* ftilde = malloc(len*sizeof(double complex));
+    complex double* ftilde = malloc(localLen*sizeof(double complex));
     for (int i = 0; i < len/2; i++){
         ftilde[i] = vec[2*i];
         ftilde[len-i-1] = vec[2*i+1];    
     }
-    fft(ftilde, len);
+    fft(ftilde, len, localLen);
     for (int i=0; i < len;i++){
         vec[i] = 2.0*creal(cexp(-I*M_PI*i/(2.0*len))*ftilde[i]);
     }
@@ -70,7 +90,7 @@ void dct(complex double *vec, int len){
 }
 
 
-void invDct(complex double *vec, int len){
+void invDct(complex double *vec, int len, int localLen){
     complex double* ftilde = malloc(len*sizeof(double complex));
     ftilde[0] = (1.0/sqrt(2))  * vec[0];
     ftilde[len/2] = (1.0/sqrt(2)) * vec[len/2];
@@ -79,7 +99,7 @@ void invDct(complex double *vec, int len){
             ftilde[i] = 0.5*((vec[i]*cos(M_PI*i/(2*len)) + vec[len-i]*sin(M_PI*i/(2*len)))+I*(vec[i]*sin(M_PI*i/(2*len)) - vec[len-i]*cos(M_PI*i/(2*len))));
         }
     }
-    invFftHelper(ftilde, len);
+    invFftHelper(ftilde, len, localLen);
     for (int i=0; i < len/2;i++){
         vec[2*i] = ftilde[i];
         vec[2*i+1] = ftilde[len-i-1];
@@ -94,29 +114,19 @@ int main(int argc, char **argv){
         printf("Not enough input arguments");
         exit(0);
     }
-    srand(time(NULL));
+    int rank, size;
     int N = pow(2, atoi(argv[2]));
-    double complex* randomVec = malloc(N*sizeof(double complex));
-    FILE* file1 = fopen("untouched.txt", "w");
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    srand(time(NULL));
+    int J = (rank < N%size) ? N/size + 1: N/size;
+    double complex* randomVec = malloc(J*sizeof(double complex));
     for (int i=0; i < N; i++){
         randomVec[i] = (double)rand() / RAND_MAX;
-        fprintf(file1, "%f\n", creal(randomVec[i]));
     }
-    fclose(file1);
-    // fft(randomVec, N);
-    dct(randomVec, N);
-    FILE * file2 = fopen("after_trans.txt", "w");
-    for (int i = 0; i < N; i++){
-        fprintf(file2, "%f\n", creal(randomVec[i]));
-    } 
-    fclose(file2);
-    invDct(randomVec,N);
-    // invFftHelper(randomVec, N);
-    FILE* file3 = fopen("transed_back.txt", "w");
-    for (int i = 0; i < N; i++){
-        fprintf(file3, "%f\n", creal(randomVec[i]));
-    } 
-    fclose(file3);
+    fft(randomVec, N, J);
+    MPI_Finalize();
     exit(0);
     free(randomVec);
 }
