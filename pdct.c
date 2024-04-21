@@ -27,6 +27,27 @@ this argument is the exponent of two which defines the length of the list
  */
 
 
+void pfft(complex double *vec, int len, int localLen, int rank, int size){
+    complex double* even = malloc(len*sizeof(complex double));
+    complex double* odd = malloc(len*sizeof(complex double));
+
+
+    for (int i = log2(len)-1; i >= 0; i--){
+        int fac = pow(2, i);
+        if (fac > localLen){ // communicate
+            if (rank % fac < fac) { // forward communication 
+
+            } else { // backwards communication 
+
+            }
+        }
+
+
+    }
+
+}
+
+
 void fft(complex double  *vec, int len, int localLen){
     // very basic implementation with several faults, that could damage performance for large inputs..
     if (len <= 1) return;
