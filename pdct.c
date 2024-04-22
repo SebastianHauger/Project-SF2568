@@ -28,14 +28,14 @@ this argument is the exponent of two which defines the length of the list
 
 void arrayPlus(complex double *vec1, complex double *vec2, int localLength, int factor, int length){
     for (int i = 0; i < localLength; i++){
-        vec1[i] += cexp(-2.0*I*M_PI*i/length) * vec2[i];
+        vec1[i] += cexp(-(2.0*I*M_PI*i)/length) * vec2[i];
     }
 }
 
 
 void arrayMinus(complex double *vec1, complex double *vec2, int localLength, int factor, int length){
     for (int i=0; i < localLength; i++){
-        vec1[i] = vec2[i] - cexp(-2.0*I*M_PI*i/length) * vec1[i];
+        vec1[i] = vec2[i] - cexp(-(2.0*I*M_PI*i)/length) * vec1[i];
     }
 }
 
@@ -48,21 +48,28 @@ void pFft(complex double *vec, int len, int localLen, int rank, int size){
         int fac = pow(2, i);
         if (fac >= localLen){ // communicate
             if ((rank*localLen) % (2*fac) < fac) { // forward communication 
-                    printf("SEND  rank = %d, expression = %d\n", rank, (rank*localLen) % (2*fac) );
+                    printf("SEND locallen = %d  rank = %d, expression = %d\n",localLen, rank, (rank*localLen) % (2*fac) );
                     MPI_Send(vec, localLen, MPI_C_DOUBLE_COMPLEX, rank+fac/localLen, tag1, MPI_COMM_WORLD);
                     MPI_Recv(recvd, localLen, MPI_C_DOUBLE_COMPLEX, rank+fac/localLen, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     arrayPlus(vec, recvd, localLen, fac, len);
                 } else { // backwards communication
-                    printf("RECEIVE rank = %d, expression = %d\n", rank, (rank*localLen) % (2*fac) );
+                    printf("Recieve locallen = %d  rank = %d, expression = %d\n",localLen, rank, (rank*localLen) % (2*fac) );
                     MPI_Recv(recvd, localLen, MPI_C_DOUBLE_COMPLEX, rank - fac/localLen, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
                     MPI_Send(vec, localLen, MPI_C_DOUBLE_COMPLEX, rank- fac/localLen, tag2, MPI_COMM_WORLD);
                     arrayMinus(vec, recvd, localLen, fac, len);
             }
         } else{
-            for (int i = 0; i < localLen/2; i++){
-                dummy = vec[i] + cexp(-2.0*I*M_PI*(i)/len) * vec[i+fac];
-                vec[i+fac] = vec[i] - cexp(-2.0*I*M_PI*(i)/len) * vec[i+fac];
-                vec[i] = dummy;   
+            for (int j = 0; j < localLen/fac; j+=2){
+                for (int i = 0; i < fac; i++){
+                    dummy = vec[j*fac + i] + cexp(-2.0*I*M_PI*i/len) * vec[(j+1)*fac+i];
+                    vec[(j+1)*fac+i] = vec[j*fac + i] - cexp(-2.0*I*M_PI*i/len) * vec[(j+1)*fac+i];
+                    vec[j*fac + i] = dummy;   
+                }
+            } 
+        }
+        if (rank == 0){
+            for (int i = 0; i < localLen; i++){
+                printf("%f + i%f\n", creal(vec[i]), cimag(vec[i]));
             }
         }
     }
@@ -128,7 +135,7 @@ void writeFile(complex double *vec, int localLen, int rank, int size, char* name
 }
 
 void shiftArray(complex double *vec, int localLen, int len, int rank, int size){
-    int tag = 1;
+    int tag = 1, tag2 = 2;
     complex double dummy;
     if (size == 1){
         return;
@@ -136,15 +143,13 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size){
     for (int i=0; i<localLen; i++){
         if (rank*localLen < len/2){
             if (i % 2 == 1){
-                printf("whaaaat?");
-                MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank+ 1, tag, MPI_COMM_WORLD);
-                MPI_Recv(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank + 1, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank+ len/(2*localLen), tag, MPI_COMM_WORLD);
+                MPI_Recv(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank + len/(2*localLen), tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             } 
         } else {
-            if (i%2 ==0){
-                printf("whaaaat?");
+            if (i%2 ==0 ){
                 MPI_Recv(&dummy, 1, MPI_C_DOUBLE_COMPLEX, rank-1, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank-1, tag, MPI_COMM_WORLD);
+                MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank-1, tag2, MPI_COMM_WORLD);
                 vec[i] = dummy;
             }
         }
