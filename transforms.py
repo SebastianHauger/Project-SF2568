@@ -10,14 +10,15 @@ def get_sol(transform='DCT'):
         return
     if transform==transforms[0]:
         data = np.loadtxt('untouched.txt', dtype=float)
-        dct(data, type=3)
+        data = dct(data, type=3)
     elif transform==transforms[1]:
         data = np.loadtxt('untouched.txt', dtype=float)
-        fft(data)
+        data = fft(data)
     elif transform==transforms[2]:
-        data = np.loadtxt('after_trans.txt', dtype=float)
-        idct(data, type=3)
+        data = np.loadtxt('after_transform.txt', dtype=float)
+        data = idct(data, type=3)
     elif transform==transforms[3]:
         data = np.loadtxt('after_trans.txt', dtype=float)
-        ifft(data)
+        data = ifft(data)
+    return data
         

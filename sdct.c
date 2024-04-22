@@ -96,21 +96,25 @@ int main(int argc, char **argv){
     srand(time(NULL));
     int N = pow(2, atoi(argv[1]));
     double complex* randomVec = malloc(N*sizeof(double complex));
-    FILE* file1 = fopen("untouched.txt", "w");
+    double temp;
+    FILE* file1 = fopen("untouched.txt", "r");
     for (int i=0; i < N; i++){
-        randomVec[i] = (double)rand() / RAND_MAX;
-        fprintf(file1, "%f\n", creal(randomVec[i]));
+        if (fscanf(file1, "%lf", &temp) != 1){
+            printf("failed");
+            exit(1);
+        }
+        randomVec[i] = temp;
     }
     fclose(file1);
-    // fft(randomVec, N);
-    dct(randomVec, N);
+    fft(randomVec, N);
+    // dct(randomVec, N);
     FILE * file2 = fopen("after_trans.txt", "w");
     for (int i = 0; i < N; i++){
         fprintf(file2, "%f\n", creal(randomVec[i]));
     } 
     fclose(file2);
-    invDct(randomVec,N);
-    // invFftHelper(randomVec, N);
+    // invDct(randomVec,N);
+    invFftHelper(randomVec, N);
     FILE* file3 = fopen("transed_back.txt", "w");
     for (int i = 0; i < N; i++){
         fprintf(file3, "%f\n", creal(randomVec[i]));

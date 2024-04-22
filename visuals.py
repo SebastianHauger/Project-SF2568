@@ -11,10 +11,12 @@ def plot_data(data, compare=False, data2 = None):
     if compare:
         plt.plot(x, data2, label='correct')
         plt.plot(x, [x-y for x,y in zip(data, data2)], label='diff')
+    plt.legend()
     plt.show()
 
 
 if __name__=='__main__':
-    compare = transforms.get_sol()
-    plot_data('after_trans.txt', compare) 
+    compare = transforms.get_sol("DFT")
+    print(compare)
+    plot_data('after_trans.txt', compare=True, data2=compare) 
     
