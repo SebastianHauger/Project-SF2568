@@ -14,8 +14,7 @@ The program takes (at the moment) and extra agrument (more than standard and MPI
 this argument is the exponent of two which defines the length of the list
  
  TODO:: 
- 1. implement scheme for DFT and invDFT 
- 2. parallelize embarrasingly parallel post processing for the inverse transform. 
+
  3. figure out scheme for pre processing DCT (and implement)
  4. figure out scheme for pre processing inverse DCT (and implement)
 
@@ -128,11 +127,13 @@ void writeFile(complex double *vec, int localLen, int rank, int size, char* name
         FILE* file = fopen(name, "w"); 
         for (int i=0;i<localLen;i++){
             // write also first element of file
-            fprintf(file, "%f\n",creal(vec[i]));
+            fprintf(file, "%f\n",creal(vec[i]));       
         }
         fclose(file); 
-        MPI_Send(&sig, 1, MPI_INT, 1, killtag, MPI_COMM_WORLD);
-    } else{
+        if (size > 1){
+            MPI_Send(&sig, 1, MPI_INT, 1, killtag, MPI_COMM_WORLD);
+        }
+    } else {
         MPI_Recv(&sig, 1, MPI_INT, rank-1, killtag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         FILE* file = fopen(name, "a");
         for (int i=0;i<localLen;i++){
@@ -158,30 +159,37 @@ unsigned int reverseBits(unsigned int num, int len){
 
 
 void shiftArray(complex double *vec, int localLen, int len, int rank, int size){
+    MPI_Status status;
+    int sender_rank;
     int tag = 1, tag2 = 2;
     complex double dummy;
     unsigned int index;
-    if (size == 1){
-        return;
-    }
+    int process;
     for (int i=0; i<localLen; i++){
-        index = reverseBits(i+rank*localLen, len);
-        if (index >= rank*localLen && index < (rank+1)*localLen && i < index){
+        index = reverseBits(i+rank*localLen, log2(len));
+        if (index >= rank*localLen && index < (rank+1)*localLen && i < index%localLen){
             // no communication. just swap local indexes.. i<index ensures no swap back
             dummy = vec[i];
-            vec[i] = vec[index];
-            vec[index] = dummy;
+            vec[i] = vec[index%localLen];
+            vec[index%localLen] = dummy;
         }
-        else if (rank*localLen < len/2){
-            MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank+ len/(2*localLen), tag, MPI_COMM_WORLD);
-            MPI_Recv(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank + len/(2*localLen), tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        } else {
-            MPI_Recv(&dummy, 1, MPI_C_DOUBLE_COMPLEX, rank-1, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, rank-1, tag2, MPI_COMM_WORLD);
-            vec[i] = dummy;
+        else if ((rank+1)*localLen <= index){
+            printf("%d -> %d", i, index);
+            MPI_Send(&index, 1, MPI_INT, index/localLen, tag, MPI_COMM_WORLD);
+            MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, index/localLen, tag2, MPI_COMM_WORLD);
+            MPI_Recv(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, index/localLen, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        } else if (index < rank*localLen ) {
+            printf("%d <- %d", i, index);
+            MPI_Recv(&index, 1, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
+            sender_rank = status.MPI_SOURCE;
+            index = index % localLen;
+            MPI_Recv(&dummy, 1, MPI_C_DOUBLE_COMPLEX, sender_rank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Send(&vec[index], 1, MPI_C_DOUBLE_COMPLEX, sender_rank, tag, MPI_COMM_WORLD);
+            vec[index] = dummy;
         }
     }
 }
+
 
 
 int main(int argc, char **argv){ 
@@ -200,9 +208,10 @@ int main(int argc, char **argv){
     int J = (rank < N%size) ? N/size + 1: N/size;
     double complex* randomVec = malloc(J*sizeof(double complex));
     for (int i=0; i < J; i++){
-        randomVec[i] = (double)rand() / RAND_MAX;
+        randomVec[i] = i; // (double)rand() / RAND_MAX;
     }
     writeFile(randomVec, J, rank, size, "untouched.txt\0");
+    printf("got here 2");
     shiftArray(randomVec, J, N, rank, size);
     pFft(randomVec, N, J, rank, size);
     writeFile(randomVec, J, rank, size, "after_transform.txt\0");
