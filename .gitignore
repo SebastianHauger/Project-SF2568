@@ -58,3 +58,9 @@ Makefile
 *.map
 *.dep
 *.stackdump
+
+test
+test.c
+test.txt
+
+*.DS_Store
