@@ -53,6 +53,22 @@ void arrayMinusBackward(complex double *vec1, complex double *vec2, int localLen
 }
 
 
+void genrealPFFT(complex double *vec, int len, int localLen, int rank, int size, int index){
+    int tag1 = 1, tag2 = 2;
+    complex double dummy;
+    double complex* recvd = malloc(localLen*sizeof(complex double));
+    for (int i = 0; i < log2(len); i++){
+        // identify which elements go forward and which go backward and then send all of them to the their correct process
+
+        // the rest of the elements are dealt with locally.. perhaps this calls for non blocking sends... 
+        // otherwise we first communicate before performing the rest of the operations 
+        // elements could be stored in local lists that we later free...
+
+
+    } 
+}
+
+
 void pFft(complex double *vec, int len, int localLen, int rank, int size){
     int tag1 = 1, tag2 = 2;
     complex double dummy;
@@ -206,6 +222,7 @@ int main(int argc, char **argv){
     srand(rank+123);
     printf("got here 1 %d\n", atoi(argv[1]));
     int J = (rank < N%size) ? N/size + 1: N/size;
+    int locind = (rank < N%size) ? (N/size + 1) * rank : N/size * rank + N%size;
     double complex* randomVec = malloc(J*sizeof(double complex));
     for (int i=0; i < J; i++){
         randomVec[i] = i; // (double)rand() / RAND_MAX;
