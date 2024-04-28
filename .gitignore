@@ -58,10 +58,13 @@ Makefile
 *.map
 *.dep
 *.stackdump
+*.txt
+
 
 test
 test.c
 test.txt
 test2.c
 t
+
 *.DS_Store
