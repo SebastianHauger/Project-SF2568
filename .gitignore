@@ -60,6 +60,8 @@ Makefile
 *.stackdump
 *.txt
 
+*.sh
+
 
 test
 test.c

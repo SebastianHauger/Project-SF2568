@@ -25,36 +25,37 @@ this argument is the exponent of two which defines the length of the list
  )
  */
 
-void arrayPlusForward(complex double *vec1, complex double *vec2, int localLength, int factor, int length){
+void arrayPlusForward(complex double *vec1, complex double *vec2, int localLength, int factor, int length, int lI){
     for (int k = 0; k < localLength; k++){
-        vec1[k] = vec1[k] + cexp(-2.0*I*M_PI*(k%factor)/(2*factor)) * vec2[k];
+        vec1[k] = vec1[k] + cexp(-2.0*I*M_PI*((k+lI)%factor)/(2*factor)) * vec2[k];
     }
 }
 
 
-void arrayMinusForward(complex double *vec1, complex double *vec2, int localLength, int factor, int length){
+void arrayMinusForward(complex double *vec1, complex double *vec2, int localLength, int factor, int length, int lI){
     for (int k=0; k < localLength; k++){
-        vec1[k] = vec2[k] - cexp(-2.0*I*M_PI*(k%factor)/(2*factor)) * vec1[k];
+        vec1[k] = vec2[k] - cexp(-2.0*I*M_PI*((k+lI)%factor)/(2*factor)) * vec1[k];
     }
 }
 
 
-void arrayPlusBackward(complex double *vec1, complex double *vec2, int localLength, int factor, int length){
+void arrayPlusBackward(complex double *vec1, complex double *vec2, int localLength, int factor, int length, int lI){
     for (int k = 0; k < localLength; k++){
-        vec1[k] = vec1[k] + cexp(2.0*I*M_PI*(k%factor)/(2*factor)) * vec2[k];
+        vec1[k] = vec1[k] + cexp(2.0*I*M_PI*((k+lI)%factor)/(2*factor)) * vec2[k];
     }
 }
 
 
-void arrayMinusBackward(complex double *vec1, complex double *vec2, int localLength, int factor, int length){
+void arrayMinusBackward(complex double *vec1, complex double *vec2, int localLength, int factor, int length, int lI){
     for (int k=0; k < localLength; k++){
-        vec1[k] = vec2[k] - cexp(2.0*I*M_PI*(k%factor)/(2*factor)) * vec1[k];
+        vec1[k] = vec2[k] - cexp(2.0*I*M_PI*((k+lI)%factor)/(2*factor)) * vec1[k];
     }
 }
 
 
 void pFft(complex double *vec, int len, int localLen, int rank, int size,int localInd, int rest, int maxLen){
-    int tag1 = 1, tag2 = 2, sendLen, sendRank;
+    MPI_Status status;
+    int tag1 = 3, tag2 = 4, sendLen, sendRank;
     complex double dummy;
     double complex* recvd = malloc(localLen*sizeof(complex double));
     for (int i = 0; i < log2(len); i++){
@@ -64,28 +65,27 @@ void pFft(complex double *vec, int len, int localLen, int rank, int size,int loc
                 sendLen = (localLen == maxLen) ? ((rank + fac/maxLen < size -rest) ? maxLen: maxLen/2) : maxLen/2;
                 if (sendLen == localLen){
                     sendRank = rank + fac/localLen;
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Send(vec, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(recvd, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 } else {
                     sendRank = size-rest + (2*(fac+(rank+rest-size)*maxLen))/maxLen;
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Send(vec, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Recv(recvd, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Send(&vec[localLen/2], sendLen, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag1, MPI_COMM_WORLD);
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Recv(&recvd[localLen/2], sendLen, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
                 }
-                arrayPlusForward(vec, recvd, localLen, fac, len);
-            } else { // backwards communication
-                sendRank = (localLen==maxLen) ? rank-fac/maxLen: size-rest - (fac- (rank+rest-size)*localLen)/maxLen; // mistake is here 
-                printf("receive fac %d rank %d send rank %d expression %d\n\n", fac, rank, sendRank,  (fac- (rank+rest-size)*localLen)/maxLen); 
-                MPI_Recv(recvd, localLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
-                printf("receive fac %d rank %d send rank %d\n\n", fac, rank, sendRank); 
-                MPI_Send(vec, localLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD);
-                arrayMinusForward(vec, recvd, localLen, fac, len);
+                arrayPlusForward(vec, recvd, localLen, fac, len, localInd);
+            } else { // backwards communication 
+                // printf("receive fac %d rank %d send rank %d expression %d\n\n", fac, rank, sendRank,  (fac - (rank+rest-size)*localLen)/maxLen - ((fac - (rank+rest-size)*localLen)%fac != 0)); 
+                MPI_Recv(recvd, localLen, MPI_C_DOUBLE_COMPLEX, MPI_ANY_SOURCE, tag1, MPI_COMM_WORLD, &status); 
+                // printf("receive fac %d rank %d send rank %d\n\n", fac, rank, sendRank); 
+                MPI_Send(vec, localLen, MPI_C_DOUBLE_COMPLEX, status.MPI_SOURCE, tag2, MPI_COMM_WORLD);
+                arrayMinusForward(vec, recvd, localLen, fac, len, localInd);
             }
         } else{
             for (int j = 0; j < localLen/fac; j+=2){
@@ -102,8 +102,10 @@ void pFft(complex double *vec, int len, int localLen, int rank, int size,int loc
 
 
 void pIfft(complex double *vec, int len, int localLen, int rank, int size, int localInd, int rest, int maxLen){
-    int tag1 = 1, tag2 = 2, sendRank, sendLen;
+    MPI_Status status;
+    int tag1 = 3, tag2 = 4, sendRank, sendLen;
     complex double dummy;
+    // printf("Inverse transform \n \n");
     double complex* recvd = malloc(localLen*sizeof(complex double));
     for (int i = 0; i < log2(len); i++){
         int fac = pow(2, i);
@@ -112,23 +114,23 @@ void pIfft(complex double *vec, int len, int localLen, int rank, int size, int l
                 sendLen = (localLen == maxLen) ? ((rank + fac/maxLen < size -rest) ? maxLen: maxLen/2) : maxLen/2;
                 if (sendLen == localLen){
                     sendRank = rank + fac/localLen;
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Send(vec, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(recvd, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 } else {
                     sendRank = size-rest + (2*(fac+(rank+rest-size)*maxLen))/maxLen;
-                    printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
+                    // printf("fac %d rank %d send rank %d\n\n", fac, rank, sendRank);
                     MPI_Send(vec, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(recvd, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     MPI_Send(&vec[localLen/2], sendLen, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag1, MPI_COMM_WORLD);
                     MPI_Recv(&recvd[localLen/2], sendLen, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
                 }
-                arrayPlusForward(vec, recvd, localLen, fac, len);
-            } else { // backwards communication
-                // printf("Recieve locallen = %d  rank = %d, expression = %d\n",localLen, rank, (rank*localLen) % (2*fac) );
-                // MPI_Recv(recvd, localLen, MPI_C_DOUBLE_COMPLEX, rank - fac/localLen, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
-                // MPI_Send(vec, localLen, MPI_C_DOUBLE_COMPLEX, rank- fac/localLen, tag2, MPI_COMM_WORLD);
-                // arrayMinusForward(vec, recvd, localLen, fac, len);
+                arrayPlusBackward(vec, recvd, localLen, fac, len, localInd);
+            } else { // backwards communication 
+                // printf("receive fac %d rank %d send rank %d expression %d\n\n", fac, rank, sendRank,  (fac - (rank+rest-size)*localLen)/maxLen - ((fac - (rank+rest-size)*localLen)%fac != 0)); 
+                MPI_Recv(recvd, localLen, MPI_C_DOUBLE_COMPLEX,MPI_ANY_SOURCE, tag1, MPI_COMM_WORLD, &status); 
+                MPI_Send(vec, localLen, MPI_C_DOUBLE_COMPLEX, status.MPI_SOURCE, tag2, MPI_COMM_WORLD);
+                arrayMinusBackward(vec, recvd, localLen, fac, len, localInd);
             }
         } else{
             for (int j = 0; j < localLen/fac; j+=2){
@@ -188,7 +190,7 @@ unsigned int reverseBits(unsigned int num, int len){
 void shiftArray(complex double *vec, int localLen, int len, int rank, int size, int localIndex, int rest, int maxLen){
     MPI_Status status;
     int sender_rank;
-    int tag = 1, tag2 = 2;
+    int tag1 = 1, tag2 = 2, tag3=3;
     complex double dummy;
     unsigned int index;
     int process;
@@ -203,15 +205,15 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
         else if (localIndex + localLen <= index){
             // controling rank, from here one can send and receive specific elements
             int corrRank = (index < (size-rest)*maxLen) ? index/maxLen: size-rest + (2*(index-(size-rest)*maxLen))/maxLen; // might be a issue 
-            MPI_Send(&index, 1, MPI_INT, corrRank, tag, MPI_COMM_WORLD);
+            MPI_Send(&index, 1, MPI_INT, corrRank, tag1, MPI_COMM_WORLD);
             MPI_Send(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, corrRank, tag2, MPI_COMM_WORLD);
-            MPI_Recv(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, corrRank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&vec[i], 1, MPI_C_DOUBLE_COMPLEX, corrRank, tag3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         } else if (index < localIndex) {
-            MPI_Recv(&index, 1, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
+            MPI_Recv(&index, 1, MPI_INT, MPI_ANY_SOURCE, tag1, MPI_COMM_WORLD, &status);
             sender_rank = status.MPI_SOURCE;
             index = index % localLen;
             MPI_Recv(&dummy, 1, MPI_C_DOUBLE_COMPLEX, sender_rank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Send(&vec[index], 1, MPI_C_DOUBLE_COMPLEX, sender_rank, tag, MPI_COMM_WORLD);
+            MPI_Send(&vec[index], 1, MPI_C_DOUBLE_COMPLEX, sender_rank, tag3, MPI_COMM_WORLD);
             vec[index] = dummy;
         }
     }
@@ -244,6 +246,7 @@ int main(int argc, char **argv){
     }
     writeFile(randomVec, J, rank, size, "untouched.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
+    writeFile(randomVec, J, rank, size, "shifted.txt\0");
     pFft(randomVec, N, J, rank, size, locind, rest, largest);
     writeFile(randomVec, J, rank, size, "after_transform.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
