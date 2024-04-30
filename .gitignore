@@ -62,7 +62,7 @@ Makefile
 
 *.sh
 
-
+plots.py
 test
 test.c
 test.txt
