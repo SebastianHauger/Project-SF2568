@@ -70,3 +70,7 @@ test2.c
 t
 
 *.DS_Store
+
+# images 
+*.png
+*.pdf

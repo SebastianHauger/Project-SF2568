@@ -1,3 +1,7 @@
+/*here i will try to go through the main components of the function to see if i can change anything 
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -53,10 +57,10 @@ void arrayMinusBackward(complex double *vec1, complex double *vec2, int localLen
 }
 
 
-void pFft(complex double *vec, int len, int localLen, int rank, int size,int localInd, int rest, int maxLen, complex double *recvd){
+void pFft(complex double *vec, int len, int localLen, int rank, int size,int localInd, int rest, int maxLen){
     int tag1 = 3, tag2 = 4, sendLen, sendRank;
     complex double dummy;
-    // double complex* recvd = malloc(localLen*sizeof(complex double));
+    double complex* recvd = malloc(localLen*sizeof(complex double));
     for (int i = 0; i < log2(len); i++){
         int fac = pow(2, i);
         if (fac >= localLen){ // communicate
@@ -93,14 +97,15 @@ void pFft(complex double *vec, int len, int localLen, int rank, int size,int loc
             } 
         }
     }
+    free(recvd);
 }
 
 
-void pIfft(complex double *vec, int len, int localLen, int rank, int size, int localInd, int rest, int maxLen, complex double *recvd){
+void pIfft(complex double *vec, int len, int localLen, int rank, int size, int localInd, int rest, int maxLen){
     int tag1 = 3, tag2 = 4, sendRank, sendLen;
     complex double dummy;
     // printf("Inverse transform \n \n");
-    // double complex* recvd = malloc(localLen*sizeof(complex double));
+    double complex* recvd = malloc(localLen*sizeof(complex double));
     for (int i = 0; i < log2(len); i++){
         int fac = pow(2, i);
         if (fac >= localLen){ // communicate
@@ -137,6 +142,7 @@ void pIfft(complex double *vec, int len, int localLen, int rank, int size, int l
             } 
         }
     }
+    free(recvd);
     for (int i=0; i < localLen; i++){
         vec[i] *= 1.0/len;
     }
@@ -234,28 +240,19 @@ int main(int argc, char **argv){
     int J = ((size-rank) > rest) ? largest: largest/2;
     int locind = ((size-rank) > rest) ? rank *largest: (size-rest)*largest + (rank+rest-size)*largest/2;
     double complex* randomVec = malloc(J*sizeof(double complex));
-    if (randomVec == NULL) {
-        fprintf(stderr, "Failed to allocate memory for randomVec\n");
-        exit(1);
-    }
-    double complex* copy = malloc(J*sizeof(double complex));
-    if (copy == NULL) {
-        fprintf(stderr, "Failed to allocate memory for copy\n");
-        exit(1);
-    }
+    
     for (int i=0; i < J; i++){
         randomVec[i] = i; 
     }
     // writeFile(randomVec, J, rank, size, "untouched.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
     // writeFile(randomVec, J, rank, size, "shifted.txt\0");
-    pFft(randomVec, N, J, rank, size, locind, rest, largest, copy);
+    pFft(randomVec, N, J, rank, size, locind, rest, largest);
     // writeFile(randomVec, J, rank, size, "after_transform.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
-    pIfft(randomVec, N, J, rank, size, locind, rest, largest, copy);
+    pIfft(randomVec, N, J, rank, size, locind, rest, largest);
     // writeFile(randomVec, J, rank, size, "transed_back.txt\0");
     free(randomVec);
-    free(copy);
     MPI_Finalize();
     exit(0); 
 }
