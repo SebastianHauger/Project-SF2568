@@ -1,8 +1,12 @@
+
+#include <sys/time.h>
+#include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <ctype.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <complex.h>
 #include <mpi.h>
 
@@ -24,6 +28,28 @@ this argument is the exponent of two which defines the length of the list
     7. Possibly try scheme on color picture as just three separate schemes
  )
  */
+int timeval_subtract (double *result, struct timeval *x, struct timeval *y){
+    struct timeval result0;
+    /* Perform the carry for the later subtraction by updating y. */
+    if (x->tv_usec < y->tv_usec) {
+        int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+        y->tv_usec -= 1000000 * nsec;
+        y->tv_sec += nsec;
+    }
+    if (x->tv_usec - y->tv_usec > 1000000) {
+        int nsec = (y->tv_usec - x->tv_usec) / 1000000;
+        y->tv_usec += 1000000 * nsec;
+        y->tv_sec -= nsec;
+    }
+    /* Compute the time remaining to wait.
+    tv_usec is certainly positive. */
+    result0.tv_sec = x->tv_sec - y->tv_sec;
+    result0.tv_usec = x->tv_usec - y->tv_usec;
+    *result = ((double)result0.tv_usec)/1e6 + (double)result0.tv_sec;
+    /* Return 1 if result is negative. */
+    return x->tv_sec < y->tv_sec;
+}
+
 
 void arrayPlusForward(complex double *vec1, complex double *vec2, int localLength, int factor, int length, int lI){
     for (int k = 0; k < localLength; k++){
@@ -218,6 +244,8 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
 int main(int argc, char **argv){ 
     // argc is argument count and argv is a list of arguments..
     int rank, size;
+    struct timeval tdr0, tdr1, tdr2, tdr3, tdr4, tdr5;
+    double restime1, restime2, restime3, restime4, restime5;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -225,6 +253,10 @@ int main(int argc, char **argv){
         printf("Not enough input arguments");
         exit(0);
     }
+    // start timer 
+    if (rank == 0)
+        gettimeofday(&tdr0, NULL);
+
     // set up environment:: this might cause errors still although it is quite properly checked 
     int log2N = atoi(argv[1]);
     int N = pow(2, log2N);
@@ -246,16 +278,36 @@ int main(int argc, char **argv){
     for (int i=0; i < J; i++){
         randomVec[i] = i; 
     }
+    gettimeofday(&tdr1, NULL);
     // writeFile(randomVec, J, rank, size, "untouched.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
     // writeFile(randomVec, J, rank, size, "shifted.txt\0");
+    if (rank == 0)
+        gettimeofday(&tdr2, NULL);
     pFft(randomVec, N, J, rank, size, locind, rest, largest, copy);
+    if (rank == 0)
+        gettimeofday(&tdr3, NULL);
     // writeFile(randomVec, J, rank, size, "after_transform.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
+    if (rank == 0)
+        gettimeofday(&tdr4, NULL);
     pIfft(randomVec, N, J, rank, size, locind, rest, largest, copy);
+    if (rank ==0)
+        gettimeofday(&tdr5, NULL);
     // writeFile(randomVec, J, rank, size, "transed_back.txt\0");
     free(randomVec);
     free(copy);
     MPI_Finalize();
+    
+    if (rank == 0){
+        FILE* file = fopen("timevals.txt", "w");
+        timeval_subtract(&restime1, &tdr1, &tdr0);
+        timeval_subtract(&restime2, &tdr2, &tdr1);
+        timeval_subtract(&restime3, &tdr3, &tdr2);
+        timeval_subtract(&restime4, &tdr4, &tdr3);
+        timeval_subtract(&restime5, &tdr5, &tdr4);
+        fprintf(file, "1: %f \n 2: %f \n 3: %f \n 4: %f \n 5: %f \n", restime1, restime2, restime3, restime4, restime5);
+        fclose(file);
+    }
     exit(0); 
 }
