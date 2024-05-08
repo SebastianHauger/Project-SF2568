@@ -28,6 +28,7 @@ this argument is the exponent of two which defines the length of the list
     7. Possibly try scheme on color picture as just three separate schemes
  )
  */
+
 int timeval_subtract (double *result, struct timeval *x, struct timeval *y){
     struct timeval result0;
     /* Perform the carry for the later subtraction by updating y. */
@@ -276,10 +277,10 @@ int main(int argc, char **argv){
         exit(1);
     }
     for (int i=0; i < J; i++){
-        randomVec[i] = i; 
+        randomVec[i] = rank *largest + i; 
     }
     gettimeofday(&tdr1, NULL);
-    // writeFile(randomVec, J, rank, size, "untouched.txt\0");
+    writeFile(randomVec, J, rank, size, "untouched.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
     // writeFile(randomVec, J, rank, size, "shifted.txt\0");
     if (rank == 0)
@@ -287,14 +288,14 @@ int main(int argc, char **argv){
     pFft(randomVec, N, J, rank, size, locind, rest, largest, copy);
     if (rank == 0)
         gettimeofday(&tdr3, NULL);
-    // writeFile(randomVec, J, rank, size, "after_transform.txt\0");
+    writeFile(randomVec, J, rank, size, "after_transform.txt\0");
     shiftArray(randomVec, J, N, rank, size, locind, rest, largest);
     if (rank == 0)
         gettimeofday(&tdr4, NULL);
     pIfft(randomVec, N, J, rank, size, locind, rest, largest, copy);
     if (rank ==0)
         gettimeofday(&tdr5, NULL);
-    // writeFile(randomVec, J, rank, size, "transed_back.txt\0");
+    writeFile(randomVec, J, rank, size, "transed_back.txt\0");
     free(randomVec);
     free(copy);
     MPI_Finalize();
