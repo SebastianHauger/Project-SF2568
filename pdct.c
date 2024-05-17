@@ -197,17 +197,19 @@ void writeFile(complex double *vec, int localLen, int rank, int size, char* name
 }
 
 
-int get_forward(complex double *vec, complex double *copy, int lL, int block, int chunk, int lI){
+
+void get_forward(complex double *vec, complex double *copy, int lL, int block, int chunk, int lI, int *i1, int *i2){
     // get elements that should be sent forward
-    int i1 = 0;
+    *i2 = 0;
     for (int j = 0; j < lL; j++){
         if (((j+ lI)%chunk < chunk/2) && ((j+lI)%(2*block) >= block) && (j+chunk/2 >= lL)){
-            printf("change %d\n", j+lI);
-            copy[i1] = vec[j];
-            i1++;
+            // printf("change %d\n", j+lI);
+            if (*i2 == 0)
+                *i1 = j;
+            copy[*i2] = vec[j];
+            (*i2)++;
         }
     }
-    return i1;
 }
 
 void get_backward(complex double *vec, complex double *copy, int lL, int block, int chunk, int lI){
@@ -229,14 +231,14 @@ void get_backward(complex double *vec, complex double *copy, int lL, int block, 
 
 void shiftArray(complex double *vec, int localLen, int len, int rank, int size, int localIndex, int rest, int maxLen, complex double *copy){
     // perform local sorting step:: we perform a smaller sort and then merge..
-    int chunk, block, tag1=1, tag2=2, sendRank, i1, i2, sendLen;
+    int chunk, block, tag1=1, tag2=2, sendRank, i1, i2;
     complex double dummy;
     for (int i = 0; i < (int)log2(len)/2; i++){
         chunk = pow(2, log2(len)-i);
         block = pow(2, i);
-        for (int j=0; j<localLen; j++){
-            // printf("%f\n", creal(vec[j]));
-        }
+        // for (int j=0; j<localLen; j++){
+        //     // printf("%f\n", creal(vec[j]));
+        // }
         for (int j = 0; j < localLen; j++){
             if (((j+ localIndex)%chunk < chunk/2) && ((j+localIndex)%(2*block) >= block) && (j+chunk/2 < localLen)){
                 // printf("change %d with %d\n", j, j + chunk/2-block);
@@ -246,24 +248,27 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
             }
         }
         if (rank%2 == 0){
-            i2 = get_forward(vec, copy, localLen, block, chunk, localIndex);
+            get_forward(vec, copy, localLen, block, chunk, localIndex, &i1, &i2);
             if (i2 > 0){ // communicate forwards
-                sendRank = (rank < size-rest) ? ((rank+chunk/(2*maxLen) < size-rest) ? rank + chunk/(2*maxLen):size-rest +2*(chunk/(2*maxLen) +rest + rank-size)): rank + chunk/(2*localLen); 
-                if ((rank < size-rest) && (sendRank >= size-rest)){
-                    // printf("send 2 from %d to %d with size %d\n", rank, sendRank, i2);
+                sendRank = localIndex + i1 + chunk/2 -block;
+                sendRank = (sendRank < ((size-rest)*maxLen)) ? sendRank/maxLen: size-rest + (2*(sendRank-(size-rest)*maxLen))/maxLen; 
+                if ((rank < size-rest) && (sendRank >= size-rest) && (localLen - i1)>maxLen/2){
+                    printf("send 2 from %d to %d with size %d\n", rank, sendRank, i2/2);
+                    printf("send 2 from %d to %d with size %d\n", rank, sendRank+1, i2/2);
                     // communicate with several ranks
                     MPI_Send(copy, i2/2, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(copy, i2/2, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     MPI_Send(&copy[i2/2], i2/2, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag1, MPI_COMM_WORLD);
                     MPI_Recv(&copy[i2/2], i2/2, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 } else {
-                    // printf("send 1 from %d to %d with size %d\n", rank, sendRank, i2);
+                    printf("send 1 from %d to %d with size %d\n", rank, sendRank, i2);
                     MPI_Send(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 }
                 i2 = 0;
                 for (int j = 0; j < localLen; j++){
-                    if (((j+ localIndex)%chunk < chunk/2) && ((j+localIndex)%(2*block) >= block) && (j+chunk/2 >= localIndex)){
+                    if (((j+ localIndex)%chunk < chunk/2) && ((j+localIndex)%(2*block) >= block) && (j+chunk/2 >= localLen)){
+                        // printf("recvd %f have %f, rank = %d\n", creal(copy[i2]), creal(vec[j]), rank); 
                         // printf("change %d\n", j+localIndex);
                         vec[j] = copy[i2];
                         i2++;
@@ -274,12 +279,18 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
             for (int j = 0; j<localLen; j++){
                 if (((j+ localIndex)%chunk >= chunk/2) && (j-chunk/2 < 0) && ((j+localIndex)%(2*block) < block)){
                     // printf("change %d\n", j+localIndex);
+                    if (i2 == 0)
+                        i1 = j;
                     i2++;
                 }
             } 
             if (i2 > 0){ // communicate backwards
-                sendRank = (rank < size-rest) ? (localIndex - chunk)/(2*maxLen) : ((rank - chunk/(2*localLen) < size -rest) ? (localIndex- chunk/2)/maxLen: rank-chunk/(2*localLen));
-                // printf("Receive from %d to %d with size %d\n", rank, sendRank, i2);
+                sendRank = localIndex + i1 - chunk/2 + block;
+                sendRank = (sendRank < ((size-rest)*maxLen)) ? sendRank/maxLen: size-rest + (2*(sendRank-(size-rest)*maxLen))/maxLen; 
+                // printf("first %d\n", (localIndex - chunk)/(2*maxLen));
+                // printf("second %d\n", (localIndex- chunk/2)/maxLen);
+                // printf("third %d\n", rank-chunk/(2*localLen));
+                printf("Receive from %d to %d with size %d\n", rank, sendRank, i2);
                 MPI_Recv(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 get_backward(vec, copy, localLen, block, chunk, localIndex); 
                 MPI_Send(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD);
@@ -289,35 +300,42 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
             for (int j = 0; j<localLen; j++){
                 if (((j+ localIndex)%chunk >= chunk/2) && (j-chunk/2 < 0) && ((j+localIndex)%(2*block) < block)){
                     // printf("change %d\n", j+localIndex);
+                    if (i2 == 0)
+                        i1 = j;
                     i2++;
                 }
             } 
             if (i2 > 0){ // communicate backwards
-                sendRank = (rank < size-rest) ? (localIndex - chunk)/(2*maxLen) : ((rank - chunk/(2*localLen) < size -rest) ? (localIndex- chunk/2)/maxLen: rank-chunk/(2*localLen));
-                // printf("Receive from %d to %d with size %d\n", rank, sendRank, i2);
+                sendRank = localIndex + i1 - chunk/2 + block;
+                sendRank = (sendRank < ((size-rest)*maxLen)) ? sendRank/maxLen: size-rest + (2*(sendRank-(size-rest)*maxLen))/maxLen; 
+                // printf("first %d\n", (localIndex - chunk)/(2*maxLen));
+                // printf("second %d\n", (localIndex- chunk/2)/maxLen);
+                // printf("third %d\n", rank-chunk/(2*localLen));
+                printf("Receive from %d to %d with size %d\n", rank, sendRank, i2);
                 MPI_Recv(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                // here we must sort out how communication should work in order to not need more storage...
                 get_backward(vec, copy, localLen, block, chunk, localIndex);    
                 MPI_Send(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD);
             }
-            i2 = get_forward(vec, copy, localLen, block, chunk, localIndex);
+            get_forward(vec, copy, localLen, block, chunk, localIndex, &i1, &i2);
             if (i2 > 0){ // communicate forwards
-                sendRank = (rank < size-rest) ? ((rank+chunk/(2*maxLen) < size-rest) ? rank + chunk/(2*maxLen):size-rest +2*(chunk/(2*maxLen) +rest + rank-size)): rank + chunk/(2*localLen); 
-                if ((rank < size-rest) && (sendRank >= size-rest)){
-                    // printf("send 1 from %d to %d with size %d\n", rank, sendRank, i2);
+                sendRank = localIndex + i1 + chunk/2 -block;
+                sendRank = (sendRank < ((size-rest)*maxLen)) ? sendRank/maxLen: size-rest + (2*(sendRank-(size-rest)*maxLen))/maxLen; 
+                if ((rank < size-rest) && (sendRank >= size-rest) && (localLen-i1)>maxLen/2){
+                    printf("send 2 from %d to %d with size %d\n", rank, sendRank, i2/2);
+                    printf("send 2 from %d to %d with size %d\n", rank, sendRank+1, i2/2);
                     // communicate with several ranks
                     MPI_Send(copy, i2/2, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(copy, i2/2, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    MPI_Send(copy, i2/2, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag1, MPI_COMM_WORLD);
-                    MPI_Recv(copy, i2/2, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Send(&copy[i2/2], i2/2, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag1, MPI_COMM_WORLD);
+                    MPI_Recv(&copy[i2/2], i2/2, MPI_C_DOUBLE_COMPLEX, sendRank+1, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 } else {
-                    // printf("send 1 from %d to %d with size %d\n", rank, sendRank, i2);
+                    printf("send 1 from %d to %d with size %d\n", rank, sendRank, i2);
                     MPI_Send(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                     MPI_Recv(copy, i2, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 }
                 i2 = 0;
                 for (int j = 0; j < localLen; j++){
-                    // printf("recvd %f have %f", creal(copy[j]), creal(vec[j]));
+                    // printf("recvd %f have %f, rank = %d\n", creal(copy[j]), creal(vec[j]), rank);
                     if (((j+ localIndex)%chunk < chunk/2) && ((j+localIndex)%(2*block) >= block) && (j+chunk/2 >= localLen)){
                         // printf("change %d\n", j+localIndex);
                         vec[j] = copy[i2];
@@ -328,8 +346,6 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
         }
     }
 }
-
-
 
 int main(int argc, char **argv){ 
     // argc is argument count and argv is a list of arguments..
