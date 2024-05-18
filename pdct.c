@@ -187,7 +187,6 @@ void writeFile(complex double *vec, int localLen, int rank, int size, char* name
 }
 
 
-
 void get_forward(complex double *vec, complex double *copy, int lL, int block, int chunk, int lI, int *i1, int *i2){
     // get elements that should be sent forward
     *i2 = 0;
