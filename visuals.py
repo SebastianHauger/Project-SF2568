@@ -44,6 +44,6 @@ def plot_bva():
 
 
 if __name__=='__main__':
-    plot_bva()
-    # plot_data()
+    # plot_bva()
+    plot_data()
     

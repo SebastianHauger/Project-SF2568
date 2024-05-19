@@ -377,6 +377,7 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
             for (int j = 0; j < localLen; j++){
                 if (((j+ localInd)%chunk >= chunk/2) && ((j+localInd)%(2*block) < block)){
                     //backwards
+                    
                     sendInd = localInd + j - chunk/2 + block;
                     next = ((j+localInd) % (2*block) == block-1) ? block + 1: 1;
                     sendRank = (sendInd < divInd) ? sendInd/(len/size + 1): len%size + (sendInd -divInd)/(len/size);
@@ -386,8 +387,8 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
                             i1 = j;
                         }
                         sendLen += 1;
-                        if ((((j+ 1+localInd)%chunk < chunk/2) && ((j+localInd)%(2*block) >= block)) || (j+next >= localLen)|| (i2 != sendRank)){
-                            // printf("1: start %d,stop %d, max %d rank %d, sendrank = %d\n", i1, i1+sendLen, localLen, rank, sendRank);
+                        if ((((j+ 1+localInd)%chunk < chunk/2) && ((j+ 1+localInd)%(2*block) >= block)) || (j+next >= localLen)|| (i2 != sendRank) || ((j+localInd)%(chunk/2) == (chunk/2 - 1 - block))){
+                            // printf("1: start %d,sendlen %d, max %d rank %d, sendrank = %d\n", i1, sendLen, localLen, rank, sendRank);
                             // printf("send from %d to %d with length %d, start %d, stop %d\n", rank, sendRank, sendLen, j, i1);
                             MPI_Recv(copy, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                             get_backward(vec, copy, localLen, block, chunk, localInd, i1, j+1);
@@ -398,18 +399,21 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
                     }
                 } else if (((j+ localInd)%chunk < chunk/2) && ((j+localInd)%(2*block) >= block)) {
                     // forwards
+                    
                     sendInd = localInd + j + chunk/2 - block;
                     sendRank = (sendInd < divInd) ? sendInd/(len/size + 1): len%size + (sendInd -divInd)/(len/size);
                     next = ((j+localInd)  % (2*block) == (2*block-1)) ? block + 1: 1;
                     i2 = ((sendInd+next) < divInd) ? (sendInd+next)/(len/size + 1): len%size + ((sendInd+next) -divInd)/(len/size);
+                    
                     if (sendRank > rank){
                         if (i1 == -1){
                             i1 = j;
                         }
                         copy[sendLen] = vec[j];
                         sendLen += 1;
-                        if ((((j+1+ localInd)%chunk >= chunk/2) && ((j+localInd)%(2*block) < block)) || (j+next >= localLen)|| (i2 != sendRank)){
-                            // printf("2: start %d,stop %d, max %d rank %d, sendrank = %d\n", i1, i1+sendLen, localLen, rank, sendRank);
+
+                        if ((((j+1+ localInd)%chunk >= chunk/2) && ((j+1+localInd)%(2*block) < block)) || (j+next >= localLen)|| (i2 != sendRank) || ((j+localInd)%(chunk/2) == chunk/2 -1)){
+                            // printf("2: start %d, sendlen %d, max %d rank %d, sendrank = %d\n", i1, sendLen, localLen, rank, sendRank);
                             // printf("send from %d to %d with length %d, start %d, stop %d\n", rank, sendRank, sendLen, j, i1);
                             MPI_Send(copy, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                             MPI_Recv(copy, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -445,8 +449,8 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
                         }
                         copy[localLen - sendLen-1] = vec[j];
                         sendLen += 1;
-                        if ((((j-1+ localInd)%chunk >= chunk/2) && ((j-1+localInd)%(2*block) < block)) || ((j-next) < 0)|| (i2 != sendRank)){
-                            // printf("3: start %d,stop %d, max %d rank %d, sendrank = %d\n", j, j+sendLen, localLen, rank, sendRank);
+                        if ((((j-1+ localInd)%chunk >= chunk/2) && ((j-1+localInd)%(2*block) < block)) || ((j-next) < 0)|| (i2 != sendRank) || ((j+localInd)%(chunk/2) == block)){
+                            // printf("3: start %d,sendlen %d, max %d rank %d, sendrank = %d\n", j, sendLen, localLen, rank, sendRank);
                             // printf("send from %d to %d with length %d, start %d, stop %d\n", rank, sendRank, sendLen, j, i1);
                             MPI_Send(&copy[localLen-sendLen], sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD);
                             MPI_Recv(copy, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -472,8 +476,8 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
                             i1 = j;
                         }
                         sendLen += 1;
-                        if ((((j-1+ localInd)%chunk < chunk/2) && ((j-1+localInd)%(2*block) >= block)) || (j-next < 0) || (i2 != sendRank)){
-                            // printf("4: start %d,stop %d, max %d rank %d, sendrank = %d\n", j, j+sendLen, localLen, rank, sendRank);
+                        if ((((j-1+ localInd)%chunk < chunk/2) && ((j-1+localInd)%(2*block) >= block)) || (j-next < 0) || (i2 != sendRank) || ((j+localInd)%(chunk/2) == 0)){
+                            // printf("4: start %d,sendlen %d max %d rank %d, sendrank = %d\n", j, sendLen, localLen, rank, sendRank);
                             // printf("send from %d to %d with length %d, start %d, stop %d\n", rank, sendRank, sendLen, j, i1);
                             MPI_Recv(copy, sendLen, MPI_C_DOUBLE_COMPLEX, sendRank, tag1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                             get_backward(vec, copy, localLen, block, chunk, localInd, j, i1+1);
@@ -524,22 +528,22 @@ int main(int argc, char **argv){
         randomVec[i] = lI  + i; 
     }
     gettimeofday(&tdr1, NULL);
-    writeFile(randomVec, J, rank, size, "untouched.txt\0");
+    // writeFile(randomVec, J, rank, size, "untouched.txt\0");
     shiftArray(randomVec, J, N, rank, size, lI, copy);
-    writeFile(randomVec, J, rank, size, "shifted.txt\0");
+    // writeFile(randomVec, J, rank, size, "shifted.txt\0");
     if (rank == 0)
         gettimeofday(&tdr2, NULL);
     pFft(randomVec, N, J, rank, size, lI, copy);
     if (rank == 0)
         gettimeofday(&tdr3, NULL);
-    writeFile(randomVec, J, rank, size, "after_transform.txt\0");
+    // writeFile(randomVec, J, rank, size, "after_transform.txt\0");
     shiftArray(randomVec, J, N, rank, size, lI, copy);
     if (rank == 0)
         gettimeofday(&tdr4, NULL);
     pIFft(randomVec, N, J, rank, size, lI,  copy);
     if (rank ==0)
         gettimeofday(&tdr5, NULL);
-    writeFile(randomVec, J, rank, size, "transed_back.txt\0");
+    // writeFile(randomVec, J, rank, size, "transed_back.txt\0");
     free(randomVec);
     free(copy);
     MPI_Finalize();
