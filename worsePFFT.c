@@ -12,11 +12,13 @@
 
 
 /*
-A program to compute the parallel DCT and IDCT using the FFT and IFFT
+This program includes functions for parallel fft and ifft with bad loadbalancing.
+The timeval_substract method is copied from pips lecture 9 available on canvas. 
 
-The program takes (at the moment) and extra agrument (more than standard and MPI arguments)
-this argument is the exponent of two which defines the length of the list
- 
+Comment out or int the writefile to get acces to the array in different stages of the program.
+
+I have found that one should use -lm compiler flag together with all the others in order for the program to run
+without crashing 
  */
 
 int timeval_subtract (double *result, struct timeval *x, struct timeval *y){

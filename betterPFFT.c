@@ -12,10 +12,13 @@
 
 
 /*
-A program to compute the parallel DCT and IDCT using the FFT and IFFT
+This program includes functions for parallel fft and ifft with better loadbalancing.
+The timeval_substract method is copied from pips lecture 9 available on canvas.
 
-The program takes (at the moment) and extra agrument (more than standard and MPI arguments)
-this argument is the exponent of two which defines the length of the list
+Comment out or int the writefile to get acces to the array in different stages of the program.
+
+I have found that one should use -lm compiler flag together with all the others in order for the program to run
+without crashing 
  
  */
 
@@ -491,6 +494,7 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
         }
     }
 }
+
 
 int main(int argc, char **argv){ 
     // argc is argument count and argv is a list of arguments..
