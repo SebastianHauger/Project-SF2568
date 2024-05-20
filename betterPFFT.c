@@ -494,8 +494,10 @@ void shiftArray(complex double *vec, int localLen, int len, int rank, int size, 
 
 int main(int argc, char **argv){ 
     // argc is argument count and argv is a list of arguments..
+    
     int rank, size;
     struct timeval tdr0, tdr1, tdr2, tdr3, tdr4, tdr5;
+    gettimeofday(&tdr0, NULL);
     double restime1, restime2, restime3, restime4, restime5;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -505,9 +507,6 @@ int main(int argc, char **argv){
         exit(0);
     }
     // start timer 
-    if (rank == 0)
-        gettimeofday(&tdr0, NULL);
-
     // set up environment:: this might cause errors still although it is quite properly checked 
     int log2N = atoi(argv[1]);
     int N = pow(2, log2N);
@@ -525,9 +524,10 @@ int main(int argc, char **argv){
         exit(1);
     }
     for (int i=0; i < J; i++){
-        randomVec[i] = lI  + i; 
+        randomVec[i] = cos(2*(i+lI)*M_PI/(N/2)) + cos(2*(i+lI)*M_PI/(N/16)); 
     }
-    gettimeofday(&tdr1, NULL);
+    if (rank == 0)
+        gettimeofday(&tdr1, NULL);
     // writeFile(randomVec, J, rank, size, "untouched.txt\0");
     shiftArray(randomVec, J, N, rank, size, lI, copy);
     // writeFile(randomVec, J, rank, size, "shifted.txt\0");

@@ -372,7 +372,7 @@ int main(int argc, char **argv){
         exit(1);
     }
     for (int i=0; i < J; i++){
-        randomVec[i] = locind + i; 
+        randomVec[i] = cos(2*(i + locind)*M_PI/(N/8)); 
     }
     gettimeofday(&tdr1, NULL);
     writeFile(randomVec, J, rank, size, "untouched.txt\0");
